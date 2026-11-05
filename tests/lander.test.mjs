@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {initialFlight,stepFlight} from '../js/lander-physics.mjs';
+const idle={thrust:false,left:false,right:false};
+test('free fall accelerates under Martian gravity and ends in a crash',()=>{let s={...initialFlight(),status:'flying'};for(let n=0;n<10000&&s.status==='flying';n++)s=stepFlight(s,idle,1/120);assert.equal(s.status,'crashed');assert.equal(s.altitude,0);assert.equal(s.fuel,100);});
+test('engine burns fuel and produces upward acceleration',()=>{const s=stepFlight({...initialFlight(),status:'flying'}, {...idle,thrust:true},.05);assert.ok(s.vy>0);assert.ok(s.fuel<100);});
+test('empty tank cannot produce thrust or lateral movement',()=>{const s=stepFlight({...initialFlight(),status:'flying',fuel:0}, {thrust:true,left:false,right:true},.05);assert.equal(s.vx,0);assert.ok(s.vy<0);assert.equal(s.fuel,0);});
+test('soft landing in the centre succeeds',()=>{const s=stepFlight({...initialFlight(),status:'flying',x:500,altitude:.01,vy:-2},idle,.02);assert.equal(s.status,'landed');});
+test('hard, sideways and off-pad contacts fail',()=>{for(const change of [{vy:-12},{vx:8},{x:200},{x:431}]){const s=stepFlight({...initialFlight(),status:'flying',x:500,altitude:.01,vy:-2,...change},idle,.02);assert.equal(s.status,'crashed');}});
+test('completed games do not advance',()=>{const s={...initialFlight(),status:'landed'};assert.equal(stepFlight(s,{...idle,thrust:true},.05),s);});
+test('a controlled descent from the default spawn can land with fuel remaining',()=>{let s={...initialFlight(),status:'flying'};for(let n=0;n<20000&&s.status==='flying';n++){const error=500-s.x;const desiredVx=Math.max(-10,Math.min(10,error*.15));const desiredVy=-Math.min(24,Math.max(2,s.altitude*.18));s=stepFlight(s,{thrust:s.vy<desiredVy,left:s.vx>desiredVx+.1,right:s.vx<desiredVx-.1},1/120);}assert.equal(s.status,'landed');assert.ok(s.fuel>0);});
